@@ -1,53 +1,60 @@
 package main
 
 import (
-    "net/http"
-    "net/http/httptest"
-    "testing"
+	"net/http"
+	"net/http/httptest"
+	"testing"
 )
 
-func TestHealthEndpoint(t *testing.T) {
-    req, err := http.NewRequest("GET", "/health", nil)
-    if err != nil {
-        t.Fatal(err)
-    }
+func TestHandleMainRoute(t *testing.T) {
+	req, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-    rr := httptest.NewRecorder()
-    handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        w.WriteHeader(http.StatusOK)
-        w.Write([]byte("OK"))
-    })
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(handleMainRoute)
+	handler.ServeHTTP(rr, req)
 
-    handler.ServeHTTP(rr, req)
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
 
-    if status := rr.Code; status != http.StatusOK {
-        t.Errorf("handler devolvió código de estado incorrecto: obtuvo %v esperaba %v",
-            status, http.StatusOK)
-    }
-
-    expected := "OK"
-    if rr.Body.String() != expected {
-        t.Errorf("handler devolvió cuerpo inesperado: obtuvo %v esperaba %v",
-            rr.Body.String(), expected)
-    }
+	expected := "Proyecto DevSecOps"
+	if !containsString(rr.Body.String(), expected) {
+		t.Errorf("handler returned unexpected body: expected to contain %v", expected)
+	}
 }
 
-func TestMainRoute(t *testing.T) {
-    req, err := http.NewRequest("GET", "/", nil)
-    if err != nil {
-        t.Fatal(err)
-    }
+func TestHandleHealthCheck(t *testing.T) {
+	req, err := http.NewRequest("GET", "/health", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-    rr := httptest.NewRecorder()
-    handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "text/html")
-        w.WriteHeader(http.StatusOK)
-    })
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(handleHealthCheck)
+	handler.ServeHTTP(rr, req)
 
-    handler.ServeHTTP(rr, req)
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
 
-    if status := rr.Code; status != http.StatusOK {
-        t.Errorf("handler devolvió código de estado incorrecto: obtuvo %v esperaba %v",
-            status, http.StatusOK)
-    }
+	expected := "OK"
+	if rr.Body.String() != expected {
+		t.Errorf("handler returned unexpected body: got %v want %v", rr.Body.String(), expected)
+	}
+}
+
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && stringContains(s, substr))
+}
+
+func stringContains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

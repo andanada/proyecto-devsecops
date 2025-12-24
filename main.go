@@ -1,64 +1,95 @@
 package main
 
 import (
-    "fmt"
-    "log"
-    "net/http"
-    "os"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"time"
 )
 
+// Logger personalizado
+type Logger struct {
+	*log.Logger
+}
+
+func NewLogger() *Logger {
+	return &Logger{
+		Logger: log.New(os.Stdout, "", 0),
+	}
+}
+
+func (l *Logger) Info(message string, fields map[string]interface{}) {
+	l.logWithLevel("INFO", message, fields)
+}
+
+func (l *Logger) Error(message string, fields map[string]interface{}) {
+	l.logWithLevel("ERROR", message, fields)
+}
+
+func (l *Logger) logWithLevel(level, message string, fields map[string]interface{}) {
+	timestamp := time.Now().Format(time.RFC3339)
+	logMsg := fmt.Sprintf(`{"timestamp":"%s","level":"%s","message":"%s"`, timestamp, level, message)
+	
+	for key, value := range fields {
+		logMsg += fmt.Sprintf(`,"%s":"%v"`, key, value)
+	}
+	logMsg += "}"
+	
+	l.Println(logMsg)
+}
+
+var logger = NewLogger()
+
 func main() {
-    // Servir archivos estáticos desde la carpeta "static"
-    fs := http.FileServer(http.Dir("./static"))
-    http.Handle("/static/", http.StripPrefix("/static/", fs))
+	http.HandleFunc("/", handleMainRoute)
+	http.HandleFunc("/health", handleHealthCheck)
+	
+	fs := http.FileServer(http.Dir("./static"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+	
+	logger.Info("Server starting", map[string]interface{}{
+		"port": "8080",
+		"env":  "production",
+	})
+	
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		logger.Error("Server failed to start", map[string]interface{}{
+			"error": err.Error(),
+		})
+		os.Exit(1)
+	}
+}
 
-    // Ruta principal que muestra la imagen
-    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        html := `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>DevSecOps Pipeline - Actividad 4</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    text-align: center;
-                    background-color: #f0f0f0;
-                    padding: 50px;
-                }
-                img {
-                    max-width: 600px;
-                    border: 3px solid #333;
-                    border-radius: 10px;
-                }
-                h1 {
-                    color: #333;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>🚀 Aplicación DevSecOps - Pipeline CI/CD Seguro</h1>
-            <p>Esta aplicación ha sido desplegada mediante un pipeline automatizado</p>
-            <img src="/static/logo.png" alt="Logo DevSecOps">
-            <p><strong>Estudiante:</strong> Actividad 4 Individual</p>
-        </body>
-        </html>
-        `
-        w.Header().Set("Content-Type", "text/html")
-        fmt.Fprint(w, html)
-    })
+func handleMainRoute(w http.ResponseWriter, r *http.Request) {
+	logger.Info("Request received", map[string]interface{}{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"ip":     r.RemoteAddr,
+	})
+	
+	w.Header().Set("Content-Type", "text/html")
+	html := `
+	<!DOCTYPE html>
+	<html>
+	<head>
+		<title>Proyecto DevSecOps</title>
+	</head>
+	<body>
+		<h1>Proyecto DevSecOps - Actividad 4</h1>
+		<img src="/static/logo.png" alt="Go Logo">
+		<p>Pipeline CI/CD funcionando correctamente</p>
+	</body>
+	</html>
+	`
+	fmt.Fprint(w, html)
+}
 
-    // Ruta de health check
-    http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-        w.WriteHeader(http.StatusOK)
-        fmt.Fprint(w, "OK")
-    })
-
-    port := os.Getenv("PORT")
-    if port == "" {
-        port = "8080"
-    }
-
-    log.Printf("Servidor iniciado en http://localhost:%s", port)
-    log.Fatal(http.ListenAndServe(":"+port, nil))
+func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
+	logger.Info("Health check", map[string]interface{}{
+		"status": "healthy",
+	})
+	
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, "OK")
 }
